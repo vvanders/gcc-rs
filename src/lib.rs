@@ -1489,6 +1489,39 @@ impl Build {
                     ))
                 }
             };
+        
+        } else if self.get_target()?.contains("emscripten") && cfg!(windows) {
+            let mut args = "".to_string();
+            for arg in objects.iter().chain(&self.objects) {
+                args.push('"');
+                for c in arg.to_str().unwrap().chars() {
+                    if c == '"' {
+                        args.push('\\')
+                    } else if c == '\\' {
+                        args.push('\\');
+                        args.push('\\');
+                    }
+                    args.push(c)
+                }
+                args.push('"');
+                args.push('\n');
+            }
+
+            let mut args_file = OsString::from(dst);
+            args_file.push(".args");
+            fs::File::create(&args_file)
+                .unwrap()
+                .write_all(args.as_bytes())
+                .unwrap();
+
+            let mut args_file_arg = OsString::from("@");
+            args_file_arg.push(args_file);
+
+            let (mut ar, cmd) = self.get_ar()?;
+            run(
+                ar.arg("crs").arg(dst).arg(args_file_arg),
+                &cmd,
+            )?;
         } else {
             let (mut ar, cmd) = self.get_ar()?;
             run(
